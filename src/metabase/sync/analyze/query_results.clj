@@ -4,7 +4,7 @@
   this is likely to extend beyond just metadata about columns but also about the query results as a whole and over
   time."
   (:require [clojure.string :as str]
-            [metabase.query-processor.interface :as qp.i]
+            [metabase.mbql.schema :as mbql.s]
             [metabase.sync.analyze.classifiers.name :as classify-name]
             [metabase.sync.analyze.fingerprint.fingerprinters :as f]
             [metabase.sync.interface :as i]
@@ -16,7 +16,7 @@
 (def ^:private DateTimeUnitKeywordOrString
   "Schema for a valid datetime unit string like \"default\" or \"minute-of-hour\"."
   (s/constrained su/KeywordOrString
-                 qp.i/datetime-field-unit?
+                 #(not (s/check mbql.s/DatetimeFieldUnit (keyword %)))
                  "Valid field datetime unit keyword or string"))
 
 (def ^:private ResultColumnMetadata

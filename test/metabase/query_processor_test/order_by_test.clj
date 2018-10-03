@@ -35,7 +35,7 @@
                  [3 13]
                  [1 22]
                  [2 59]]
-   :cols        [(breakout-col (venues-col :price))
+   :cols        [(venues-col :price)
                  (aggregate-col :count)]
    :native_form true}
   (->> (data/run-mbql-query venues
@@ -54,7 +54,7 @@
                  [1 1211]
                  [3  615]
                  [4  369]]
-   :cols        [(breakout-col (venues-col :price))
+   :cols        [(venues-col :price)
                  (aggregate-col :sum (venues-col :id))]
    :native_form true}
   (->> (data/run-mbql-query venues
@@ -73,7 +73,7 @@
                  [3 13]
                  [1 22]
                  [2 59]]
-   :cols        [(breakout-col (venues-col :price))
+   :cols        [(venues-col :price)
                  (aggregate-col :count)]
    :native_form true}
   (->> (data/run-mbql-query venues
@@ -92,7 +92,7 @@
                  [2 28]
                  [1 32]
                  [4 53]]
-   :cols        [(breakout-col (venues-col :price))
+   :cols        [(venues-col :price)
                  (aggregate-col :avg (venues-col :category_id))]
    :native_form true}
   (->> (data/run-mbql-query venues
@@ -112,7 +112,7 @@
                  [1 24]
                  [2 21]
                  [4 (if (contains? #{:mysql :crate} *engine*) 14 15)]]
-   :cols        [(breakout-col (venues-col :price))
+   :cols        [(venues-col :price)
                  (aggregate-col :stddev (venues-col :category_id))]
    :native_form true}
   (->> (data/run-mbql-query venues

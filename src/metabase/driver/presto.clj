@@ -25,8 +25,7 @@
              [i18n :refer [tru]]
              [ssh :as ssh]])
   (:import java.sql.Time
-           java.util.Date
-           metabase.query_processor.interface.TimeValue))
+           java.util.Date))
 
 (defrecord PrestoDriver []
   :load-ns true
@@ -229,11 +228,11 @@
    (let [tz (time/time-zone-for-id tz-id)]
      (tformat/unparse (tformat/with-zone time-format tz) (tcoerce/to-date-time t)))))
 
-(defmethod sqlqp/->honeysql [PrestoDriver TimeValue]
+#_(defmethod sqlqp/->honeysql [PrestoDriver TimeValue]
   [_ {:keys [value timezone-id]}]
   (hx/cast :time (time->str value timezone-id)))
 
-(defmethod sqlqp/->honeysql [PrestoDriver Time]
+#_(defmethod sqlqp/->honeysql [PrestoDriver Time]
   [_ {:keys [value]}]
   (hx/->time (time->str value)))
 

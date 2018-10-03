@@ -30,7 +30,9 @@
             [metabase.util :as u]
             [metabase.util.schema :as su]
             [schema.core :as s]
-            [toucan.db :as db]))
+            [toucan
+             [db :as db]
+             [hydrate :refer [hydrate]]]))
 
 (def ^:private ExternalRemappingDimension
   "Schema for the info we fetch about `external` type Dimensions that will be used for remappings in this Query. Fetched
@@ -84,6 +86,7 @@
   "Add any Fields needed for `:external` remappings to the `:fields` clause of the query, and update `:order-by`
   clause as needed. Returns a pair like `[external-remapping-dimensions updated-query]`."
   [{{:keys [fields order-by]} :query, :as query} :- mbql.s/Query]
+  ;; TODO - I think we need to handle Fields in `:breakout` here as well...
   ;; fetch remapping column pairs if any exist...
   (if-let [remap-col-tuples (seq (create-remap-col-tuples fields))]
     ;; if they do, update `:fields` and `:order-by` clauses accordingly and add to the query
@@ -141,7 +144,6 @@
    :name            col-name
    :display_name    col-name
    :target          nil
-   :extra_info      {}
    :remapped_from   remapped-from
    :remapped_to     nil})
 

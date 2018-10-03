@@ -21,9 +21,9 @@
              [cache :as cache]
              [catch-exceptions :as catch-exceptions]
              [cumulative-aggregations :as cumulative-ags]
+             [desugar :as desugar]
              [dev :as dev]
              [driver-specific :as driver-specific]
-             [expand :as expand]
              [expand-macros :as expand-macros]
              [fetch-source-query :as fetch-source-query]
              [format-rows :as format-rows]
@@ -33,13 +33,13 @@
              [normalize-query :as normalize]
              [parameters :as parameters]
              [permissions :as perms]
-             [resolve :as resolve]
              [resolve-driver :as resolve-driver]
              [resolve-fields :as resolve-fields]
              [results-metadata :as results-metadata]
              [source-table :as source-table]
              [store :as store]
-             [validate :as validate]]
+             [validate :as validate]
+             [wrap-value-literals :as wrap-value-literals]]
             [metabase.query-processor.util :as qputil]
             [metabase.util
              [date :as du]
@@ -95,6 +95,8 @@
   (-> f
       dev/guard-multiple-calls
       mbql-to-native/mbql->native                      ; ▲▲▲ NATIVE-ONLY POINT ▲▲▲ Query converted from MBQL to native here; all functions *above* will only see the native query
+      wrap-value-literals/wrap-value-literals
+      desugar/desugar
       annotate-and-sort/annotate-and-sort
       perms/check-query-permissions
       dev/check-results-format
@@ -102,8 +104,6 @@
       cumulative-ags/handle-cumulative-aggregations
       results-metadata/record-and-return-metadata!
       format-rows/format-rows
-      resolve/resolve-middleware
-      expand/expand-middleware                         ; ▲▲▲ QUERY EXPANSION POINT  ▲▲▲ All functions *above* will see EXPANDED query during PRE-PROCESSING
       binning/update-binning-strategy
       resolve-fields/resolve-fields
       add-dim/add-remapping
@@ -149,8 +149,6 @@
   "Expand a QUERY the same way it would normally be done as part of query processing.
    This is useful for things that need to look at an expanded query, such as permissions checking for Cards."
   (->> identity
-       resolve/resolve-middleware
-       expand/expand-middleware
        source-table/resolve-source-table-middleware
        parameters/substitute-parameters
        expand-macros/expand-macros

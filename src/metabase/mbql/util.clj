@@ -5,7 +5,9 @@
              [walk :as walk]]
             [metabase.mbql.schema :as mbql.s]
             [metabase.util :as u]
-            [metabase.util.schema :as su]
+            [metabase.util
+             [date :as du]
+             [schema :as su]]
             [schema.core :as s]))
 
 (s/defn normalize-token :- s/Keyword
@@ -96,7 +98,9 @@
     ;; -> {:filter [:= 200 100], :breakout [:field-id 100]}"
   {:style/indent 3}
   [query keypath k-or-ks f]
-  (update-in query keypath #(replace-clauses % k-or-ks f)))
+  (if-not (seq (get-in query keypath))
+    query
+    (update-in query keypath #(replace-clauses % k-or-ks f))))
 
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
@@ -209,3 +213,23 @@
       outer-query
       ;; otherwise add new clause at the end
       (update-in outer-query [:query :order-by] (comp vec conj) order-by-clause))))
+
+
+(s/defn add-datetime-units :- mbql.s/DateTimeValue
+  "Return a `relative-datetime` clause with `n` units added to it."
+  [absolute-or-relative-datetime :- mbql.s/DateTimeValue
+   n                             :- s/Num]
+  (if (is-clause? :relative-datetime absolute-or-relative-datetime)
+    (let [[_ original-n unit] absolute-or-relative-datetime]
+      [:relative-datetime (+ n original-n) unit])
+    (let [[_ timestamp unit] absolute-or-relative-datetime]
+      (du/relative-date unit n timestamp))))
+
+
+(defn dispatch-by-clause-name-or-class
+  "Dispatch function perfect for use with multimethods that dispatch off elements of an MBQL query. If `x` is an MBQL
+  clause, dispatches off the clause name; otherwise dispatches off `x`'s class."
+  [x]
+  (if (mbql-clause? x)
+    (first x)
+    (class x)))
