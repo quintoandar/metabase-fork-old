@@ -74,6 +74,9 @@
     "Return a HoneySQL form for truncating a date or timestamp field or value to a given resolution, or extracting a
      date component.")
 
+  (table-types ^java.util.Set [this]
+    "*OPTIONAL*. Set of string names of table types.")
+
   (excluded-schemas ^java.util.Set [this]
     "*OPTIONAL*. Set of string names of schemas to skip syncing tables from.")
 
@@ -297,9 +300,9 @@
 
 (defn- get-tables
   "Fetch a JDBC Metadata ResultSet of tables in the DB, optionally limited to ones belonging to a given schema."
-  ^ResultSet [^DatabaseMetaData metadata, ^String schema-or-nil, ^String database-name-or-nil]
+  ^ResultSet [^DatabaseMetaData metadata, ^String schema-or-nil, ^String database-name-or-nil, ^java.util.Set table-types]
   (with-resultset-open [rs-seq (.getTables metadata database-name-or-nil schema-or-nil "%" ; tablePattern "%" = match all tables
-                                           (into-array String ["TABLE", "VIEW", "FOREIGN TABLE", "MATERIALIZED VIEW"]))]
+                                           (into-array String table-types))]
     ;; Ensure we read all rows before exiting
     (doall rs-seq)))
 
@@ -315,7 +318,7 @@
     (let [all-schemas (set (map :table_schem rs-seq))
           schemas     (set/difference all-schemas (excluded-schemas driver))]
       (set (for [schema schemas
-                 table  (get-tables metadata schema database-name-or-nil)]
+                 table  (get-tables metadata schema database-name-or-nil (table-types driver))]
              (let [remarks (:remarks table)]
                {:name        (:table_name table)
                 :schema      schema
@@ -476,6 +479,7 @@
    :apply-page           (resolve 'metabase.driver.generic-sql.query-processor/apply-page)
    :column->special-type (constantly nil)
    :current-datetime-fn  (constantly :%now)
+   :table-types          (constantly ["TABLE", "VIEW", "FOREIGN TABLE", "MATERIALIZED VIEW"])
    :excluded-schemas     (constantly nil)
    :field->identifier    (u/drop-first-arg (comp (partial apply hsql/qualify) field/qualified-name-components))
    :field->alias         (u/drop-first-arg :name)
