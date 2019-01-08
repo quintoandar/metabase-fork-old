@@ -17,62 +17,68 @@ import {
   getVisualizationTransformed,
   extractRemappings,
 } from "metabase/visualizations";
+import { updateSettings } from "metabase/visualizations/lib/settings";
+
+// section names are localized
+const DEFAULT_TAB_PRIORITY = [t`Display`];
 
 class ChartSettings extends Component {
   constructor(props) {
     super(props);
-    const initialSettings = props.series[0].card.visualization_settings;
     this.state = {
-      currentTab: null,
-      settings: initialSettings,
-      series: this._getSeries(props.series, initialSettings),
-      showWidget: props.initialWidget,
+      currentSection: (props.initial && props.initial.section) || null,
+      currentWidget: (props.initial && props.initial.widget) || null,
+      ...this._getState(
+        props.series,
+        props.series[0].card.visualization_settings,
+      ),
     };
   }
 
   componentWillReceiveProps(nextProps) {
     if (this.props.series !== nextProps.series) {
-      this.setState({
-        series: this._getSeries(
-          nextProps.series,
-          nextProps.series[0].card.visualization_settings,
-        ),
-      });
+      this.setState(this._getState(nextProps.series, this.state.settings));
     }
   }
 
-  _getSeries(series, settings) {
-    if (settings) {
-      series = assocIn(series, [0, "card", "visualization_settings"], settings);
-    }
-    const transformed = getVisualizationTransformed(extractRemappings(series));
-    return transformed.series;
+  _getState(series, settings) {
+    const rawSeries = assocIn(
+      series,
+      [0, "card", "visualization_settings"],
+      settings,
+    );
+    const { series: transformedSeries } = getVisualizationTransformed(
+      extractRemappings(rawSeries),
+    );
+    return {
+      settings,
+      rawSeries,
+      transformedSeries,
+    };
   }
 
-  handleSelectTab = tab => {
-    this.setState({ currentTab: tab });
+  handleShowSection = section => {
+    this.setState({ currentSection: section, currentWidget: null });
+  };
+
+  // allows a widget to temporarily replace itself with a different widget
+  handleShowWidget = widget => {
+    this.setState({ currentWidget: widget });
+  };
+
+  // go back to previously selected section
+  handleEndShowWidget = () => {
+    this.setState({ currentWidget: null });
   };
 
   handleResetSettings = () => {
     MetabaseAnalytics.trackEvent("Chart Settings", "Reset Settings");
-    this.setState({
-      settings: {},
-      series: this._getSeries(this.props.series, {}),
-    });
+    this.setState(this._getState(this.props.series, {}));
   };
 
-  handleChangeSettings = newSettings => {
-    for (const key of Object.keys(newSettings)) {
-      MetabaseAnalytics.trackEvent("Chart Settings", "Change Setting", key);
-    }
-    const settings = {
-      ...this.state.settings,
-      ...newSettings,
-    };
-    this.setState({
-      settings: settings,
-      series: this._getSeries(this.props.series, settings),
-    });
+  handleChangeSettings = changedSettings => {
+    const newSettings = updateSettings(this.state.settings, changedSettings);
+    this.setState(this._getState(this.props.series, newSettings));
   };
 
   handleDone = () => {
@@ -84,57 +90,52 @@ class ChartSettings extends Component {
     this.props.onClose();
   };
 
-  // allows a widget to temporarily replace itself with a different widget
-  handleShowWidget = widget => {
-    this.setState({ showWidget: widget });
-  };
-  handleEndShowWidget = () => {
-    this.setState({ showWidget: null });
-  };
-
   render() {
     const { isDashboard, question, addField } = this.props;
-    const { series, showWidget } = this.state;
+    const { rawSeries, transformedSeries, currentWidget } = this.state;
 
     const widgetsById = {};
 
-    const tabs = {};
+    const sections = {};
     for (const widget of getSettingsWidgetsForSeries(
-      series,
+      transformedSeries,
       this.handleChangeSettings,
       isDashboard,
     )) {
       widgetsById[widget.id] = widget;
       if (widget.widget && !widget.hidden) {
-        tabs[widget.section] = tabs[widget.section] || [];
-        tabs[widget.section].push(widget);
+        sections[widget.section] = sections[widget.section] || [];
+        sections[widget.section].push(widget);
       }
     }
 
     // Move settings from the "undefined" section in the first tab
-    if (tabs["undefined"] && Object.values(tabs).length > 1) {
-      let extra = tabs["undefined"];
-      delete tabs["undefined"];
-      Object.values(tabs)[0].unshift(...extra);
+    if (sections["undefined"] && Object.values(sections).length > 1) {
+      let extra = sections["undefined"];
+      delete sections["undefined"];
+      Object.values(sections)[0].unshift(...extra);
     }
 
-    const tabNames = Object.keys(tabs);
-    const currentTab = this.state.currentTab || tabNames[0];
+    const sectionNames = Object.keys(sections);
+    const currentSection =
+      this.state.currentSection ||
+      _.find(DEFAULT_TAB_PRIORITY, name => name in sections) ||
+      sectionNames[0];
 
     let widgets;
-    let widget = showWidget && widgetsById[showWidget.id];
+    let widget = currentWidget && widgetsById[currentWidget.id];
     if (widget) {
       widget = {
         ...widget,
         hidden: false,
         props: {
           ...(widget.props || {}),
-          ...(showWidget.props || {}),
+          ...(currentWidget.props || {}),
         },
       };
       widgets = [widget];
     } else {
-      widgets = tabs[currentTab];
+      widgets = sections[currentSection];
     }
 
     const extraWidgetProps = {
@@ -147,12 +148,12 @@ class ChartSettings extends Component {
 
     return (
       <div className="flex flex-column spread">
-        {tabNames.length > 1 && (
+        {sectionNames.length > 1 && (
           <div className="border-bottom flex flex-no-shrink pl4">
             <Radio
-              value={currentTab}
-              onChange={this.handleSelectTab}
-              options={tabNames}
+              value={currentSection}
+              onChange={this.handleShowSection}
+              options={sectionNames}
               optionNameFn={v => v}
               optionValueFn={v => v}
               underlined
@@ -181,7 +182,7 @@ class ChartSettings extends Component {
               <div className="mx4 flex-full relative">
                 <Visualization
                   className="spread"
-                  rawSeries={series}
+                  rawSeries={rawSeries}
                   showTitle
                   isEditing
                   isDashboard
